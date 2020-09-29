@@ -92,6 +92,7 @@ end
 function init_game()
 	local t=time()
 	game={
+		frk_up=false,
 		score=0,
 		zone="",
 		over=false,
@@ -573,8 +574,9 @@ function spawn_new_pieces()
 	cols[spawn_col].next_sp=level.sp_pieces[piece_index]
 	spawn_col=get_rnd(4,spawn_col)
 	local frk=rnd(1)
-	if frk<.25 then
-		if frk<.125 then
+	if frk<.18 then
+		game.frk_up=not game.frk_up
+		if game.frk_up then
 			cols[spawn_col].next_sp=126
 		else
 			cols[spawn_col].next_sp=125
