@@ -66,9 +66,9 @@ function init_sp_names()
 		"stawberries",
 		"green apples",
 		"plums",
-		"grapefruit (again)",
-		"red apples ''",
-		"raspberries ''",
+		"grapefruit",
+		"red apples",
+		"raspberries",
 		"eclairs",
 		"sundaes",
 		"cherry pies",
@@ -86,6 +86,90 @@ function init_sp_names()
 		"donuts",
 		"lollies",
 		"cinnamon rolls"
+		}
+		junk={
+			"always pre-peared",
+			"an apple a day...",
+			"apple of my eye",
+			"bad apple!",
+			"bearing fruit",
+			"berry funny",
+			"berry good",
+			"cherry nice",
+			"cherrific",
+			"cherry on the cake",
+			"cherry picked",
+			"clockwork orange",
+			"easy peasy lemon squeezy",
+			"forbidden fruit",
+			"fruit basket",
+			"fruit cake",
+			"fruit cocktail",
+			"fruit farm",
+			"fruit loop",
+			"fruit of life",
+			"fruit punch",
+			"fruits of your labour",
+			"go bananas",
+			"how do you like them apples?",
+			"if life gives you lemons...",
+			"in the lime-light",
+			"life is a bowl of cherries",
+			"low hanging fruit",
+			"made for peach other",
+			"never split",
+			"one in a melon",
+			"passion fruit",
+			"peach for the stars",
+			"peach to thier own",
+			"peaches and cream",
+			"pear shaped",
+			"pear-fect",
+			"pick of the bunch",
+			"plum crazy",
+			"plum job",
+			"plum-believable",
+			"resistance is fruitile",
+			"ripe for the picking",
+			"rotten apple spoils...",
+			"s-peach-less",
+			"strawberry fields",
+			"sub-lime",
+			"the apple never falls far",
+			"the time is ripe",
+			"top banana",
+			"zest for life"
+		}
+		junk2={
+			"ain't seen muffin yet",
+			"another one bites the crust",
+			"bake it happen",
+			"baking new ground",
+			"cake it easy",
+			"cake walk",
+			"catcher in the pie",
+			"cone-gratulations",
+			"cream team",
+			"donut lose hope",
+			"donut stop believing",
+			"don't sweet it",
+			"flan-tastic",
+			"gateaux blaster",
+			"hot chocolate",
+			"legend in the baking",
+			"life of pie",
+			"live and let pie",
+			"livin the cream",
+			"muffin compares",
+			"muffin to it",
+			"piece of cake",
+			"proof is in the pudding",
+			"smart cookie",
+			"stop at muffin",
+			"sundae schooled",
+			"tough cookie",
+			"waffley good",
+			"winner bakes it all"
 		}
 end
 
@@ -126,6 +210,7 @@ function init_ready()
 	camera(0,0)
 	game.over=false
 	game.fall_wait-=0.01
+	game.frk_up=false
 	level={
 		clear=false,
 		name="fruity",
@@ -133,6 +218,13 @@ function init_ready()
 		drop_wait=2,
 		sp_pieces={}
 	}
+	
+	local j=junk
+	if game.zone=="sweet" then
+		j=junk2
+	end
+	junk_tx=j[flr(rnd(#j)+1)]
+
 	local l=game.level
 	while l>=10 do
 		l-=9
@@ -193,20 +285,27 @@ function draw_title()
 		game.hi_colr,game.mi_colr)
 end
 
-function draw_ready()
+function draw_ready(skip)
+	rectfill(56,10,72,16,0)	
+	outline(junk_tx,64-#junk_tx*2,10,
+		game.hi_colr,game.mi_colr)
+	
+	if not skip and time()-game.tick_last<3.5 then
+		return
+	end
 	cls(0)
 	local tx="ready level "..game.level	
 	outline(tx,64-#tx*2,10,
 		game.hi_colr,game.mi_colr)
 	tx=game.zone.." zone"	
-	outline(tx,64-#tx*2,18,
+	outline(tx,64-#tx*2,19,
 		game.hi_colr,game.mi_colr)
 	tx="press ❎"
 	outline(tx,64-#tx*2,108,
 		game.hi_colr,game.mi_colr)
 		
 	local names=sp_names_f
-	local x=40
+	local x=35
 	for i=1,#level.sp_pieces do
 		local sp=level.sp_pieces[i]
 		spr(sp,x,24+(i*16))
@@ -374,16 +473,15 @@ end
 function update_level()
 	
 	--delete matches
-	local lvl_clear=true
 	local deleted_something=false
 	for i=1,#cols do
 		local row_idx=game.row_count
-		local match_col=cols[i]
+		local col=cols[i]
 		while row_idx>1 
-			and match_col.rows[row_idx]~=0 
-			and match_col.rows[row_idx]~=127 do
-			local sp_r=match_col.rows[row_idx]
-			local sp_n=match_col.rows[row_idx-1]
+			and col.rows[row_idx]~=0 
+			and col.rows[row_idx]~=127 do
+			local sp_r=col.rows[row_idx]
+			local sp_n=col.rows[row_idx-1]
 			
 			-- get down fork
 			local df=0
@@ -397,16 +495,23 @@ function update_level()
 			if df>0 then
 				local has_up_fork=false
 				for uf=df,game.row_count,1 do
-					if match_col.rows[uf]==126 then
+					if col.rows[uf]==126 then
 						has_up_fork=true
+						sfx(51,3)
 						for g=df,uf,1 do
-							match_col.rows[g]=127
+							col.rows[g]=127
+							add_points(5)
+							--todo: bonus fork points?
 						end
+						deleted_something=true
 						break
 					end
 				end
 				if not has_up_fork then
-					match_col.rows[df]=127
+					sfx(51,3)
+					col.rows[df]=127
+					game.frk_up=not game.frk_up
+					deleted_something=true
 				end
 			
 			-- if matching pair
@@ -416,32 +521,44 @@ function update_level()
 						sfx(51,3)
 					end
 					if sp_r~=126 then
-						match_col.rows[row_idx]=127
+						col.rows[row_idx]=127
 					end
-					match_col.rows[row_idx-1]=127
+					col.rows[row_idx-1]=127
 					deleted_something=true
 					add_points(5)
 			end
 			row_idx-=1
 		end
-		if lvl_clear and match_col.rows[game.row_count]>0 
-			and match_col.rows[game.row_count]<127 then
-			lvl_clear=false
-		end
 	end
-	if deleted_something and lvl_clear then
-		if music_tune then
-			music(27)
+
+	if deleted_something then
+		local lvl_clear=true
+		for c=1,game.col_count do
+			local col=cols[c]
+			for r=#col.rows,1,-1 do
+				if col.rows[r]>0 and col.rows[r]<64 then
+					lvl_clear=false
+					break
+				end
+			end
 		end
-		level.clear=true
-		game.level+=1		
-		--todo: check end of game
-		init_ready()
+		if lvl_clear then
+			level.clear=true
+		end
 	end
 
 	if time()-game.tick_last>game.tick_wait then
 		game.tick_last=time()
 		
+		if level.clear then
+			if music_tune then
+				music(27)
+			end			
+			game.level+=1		
+			--todo: check end of game
+			init_ready()
+		end
+
 		if game.over then
 			init_end()
 			return
@@ -449,10 +566,10 @@ function update_level()
 		
 		--remove deleted
 		for i=1,#cols do
-			local match_col=cols[i]
+			local col=cols[i]
 			for r=1,game.row_count do
-				if match_col.rows[r]==127 then
-					match_col.rows[r]=0
+				if col.rows[r]==127 then
+					col.rows[r]=0
 				end
 			end
 		end
@@ -574,7 +691,7 @@ function spawn_new_pieces()
 	cols[spawn_col].next_sp=level.sp_pieces[piece_index]
 	spawn_col=get_rnd(4,spawn_col)
 	local frk=rnd(1)
-	if frk<.18 then
+	if frk<.15 then
 		game.frk_up=not game.frk_up
 		if game.frk_up then
 			cols[spawn_col].next_sp=126
@@ -597,13 +714,16 @@ function drop_spawned_pieces()
 						sfx(51,3)
 					end
 					col.rows[1]=127
-					col.nex_sp=0
-				else
-					game.over=true
-					if music_tune then
-						music(26)
-					end
-					break
+					col.next_sp=0
+				elseif col.next_sp==125 then 
+						col.rows[1]=col.next_sp
+						col.next_sp=0
+					else
+						game.over=true
+						if music_tune then
+							music(26)
+						end
+						break
 				end
 			end 
 			col.y=game.spawn_y+1
