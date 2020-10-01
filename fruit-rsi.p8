@@ -21,7 +21,7 @@ function _init()
 end
 
 function init_title()
-	radius=7
+	radius=8
 	originx=9
 	originy=48
 	title={
@@ -42,7 +42,7 @@ function init_title()
 			mset(x,y,flr(rnd(19))+1)
 		end
 	end
-	
+	game.fall_wait=0.26	
 	_draw=draw_title
 	_update60=update_title
 end
@@ -190,14 +190,15 @@ function init_game()
 		spawn_y=24,
 		drop_last=t,
 		fall_last=t,
-		fall_wait=0.25,
+		fall_wait=0.26,
 		tick_last=t,
 		tick_wait=.25,
 		col_select=1,
 		swap=false,
 		lo_colr=5,
 		mi_colr=1,
-		hi_colr=13
+		hi_colr=13,
+		br_colr=12
 	}
 	game.drop_from_y=game.spawn_y+9
 	game.catch_at_y=game.spawn_y+1
@@ -209,7 +210,9 @@ end
 function init_ready()
 	camera(0,0)
 	game.over=false
-	game.fall_wait-=0.01
+	if game.fall_wait>.07 then
+		game.fall_wait-=0.01
+	end
 	game.frk_up=false
 	level={
 		clear=false,
@@ -253,7 +256,7 @@ function init_level()
 			next_sp=0,
 			y=0
 		}
-		col.x=21+col_idx*game.col_width
+		col.x=20+col_idx*game.col_width
 		col.rows={}
 		for r=1,game.row_count do
 			col.rows[r]=0
@@ -265,6 +268,7 @@ function init_level()
 end
 
 function init_end()
+	game.score=0
 	_update60=update_end
 	_draw=draw_end
 end
@@ -285,12 +289,12 @@ function draw_title()
 		game.hi_colr,game.mi_colr)
 end
 
-function draw_ready(skip)
-	rectfill(56,10,72,16,0)	
-	outline(junk_tx,64-#junk_tx*2,10,
-		game.hi_colr,game.mi_colr)
+function draw_ready()
+	outline(junk_tx,
+		64-#junk_tx*2,6,
+		0,game.br_colr)
 	
-	if not skip and time()-game.tick_last<3.5 then
+	if game.score>0 and time()-game.tick_last<3.5 then
 		return
 	end
 	cls(0)
@@ -308,10 +312,14 @@ function draw_ready(skip)
 	local x=35
 	for i=1,#level.sp_pieces do
 		local sp=level.sp_pieces[i]
-		spr(sp,x,24+(i*16))
-		print(names[sp],x+12,
-			25+(i*16),
-			game.hi_colr)		
+		tx=names[sp]
+		print(tx,
+			68-#tx*2,
+			22+(i*16),
+			game.hi_colr)
+		spr(sp,
+			55-#tx*2,
+			20+(i*16))		
 	end
 end
 
@@ -319,13 +327,17 @@ function draw_end()
 	local tx="press ❎"
 	outline(tx,64-#tx*2,10,
 		game.hi_colr,game.mi_colr)
-	tx="fffffuuuuuuuu"
+	tx="the end"
 	outline(tx,64-#tx*2,50,
-		game.hi_colr,game.mi_colr)
+		0,game.br_colr)
 end
 
 function draw_level()
-	cls(0)
+	fillp(0b0011001111001100)
+	fillp(0b1010010110100101)
+	rectfill(0,0,128,128,game.mi_colr)
+	fillp()
+	--cls()
 	draw_hud()
 	draw_columns()
 	if deb then
@@ -333,23 +345,47 @@ function draw_level()
 	end
 end
 
+function prints(t,x,y,c,s)
+	print(t,x+1,y+1,s)
+	print(t,x,y,c)
+end
+
 function draw_hud()
-	print("level ",0,22,game.hi_colr)
-	print(game.level,0,30,game.hi_colr)
-	print(game.zone,0,38,game.hi_colr)
-	print("zone",0,46,game.hi_colr)
+
+	--draw level number
+	local t=20
+	local l=2
+	local w=25
+	local h=53
+	rectfill(l-1,t-1,l+w+1,h+1,0)	
+	rect(l,t,l+w,h,1)
+	local s=1
+	local c=game.hi_colr
+	prints("level ",l+2,22,c,s)
+	prints(game.level,l+2,30,c,s)
+	prints(game.zone,l+2,38,c,s)
+	prints("zone",l+2,46,c,s)
 
 	--draw score
-	print("score",108,22,game.hi_colr)
-	print(pad(tostr(game.score),5),108,30,game.hi_colr)
+	local o=98
+	rectfill(l+o-1,t-1,l+w+1+o,h+1,0)	
+	rect(l+o,t,l+w+o,h,1)
+	prints("score",l+o+2,22,c,s)
+	prints(pad(tostr(game.score),5),
+		l+o+2,30,c,s)
 end
 
-function draw_debug()	  
+function draw_debug()	
+	print(game.fall_wait,0,0)  
 end
 
-function draw_columns()
-	rectfill(cols[1].x-4,021,
-		cols[1].x+59,103,1)	
+function draw_columns()	
+	local l=cols[1].x-4
+	local t=20
+	local w=63
+	local h=82
+	rectfill(l,t,l+w,t+h,1)	
+	rect(l-1,t-1,l+w+1,t+h+1,0)	
 	for i=#cols,1,-1 do
 		draw_column(i)
 	end		
@@ -402,11 +438,13 @@ function draw_column(col_idx)
 			--if swapping column
 			if game.swap and col_idx==game.col_select then
 				y=game.spawn_y+2+row_idx*(game.cell_height+(swap_anim.step*0.3))
-				zspr(cell_sp,1,1,swap_anim.left,y,1+(.07*swap_anim.step))
+				local sx=swap_anim.left
+				zspr(cell_sp,1,1,sx,y,1+(.07*swap_anim.step))
 			--if other swap column
 			elseif game.swap and col_idx==game.col_select+1 then
 				y=game.spawn_y+2+row_idx*(game.cell_height-(swap_anim.step*0.3))
-				zspr(cell_sp,1,1,swap_anim.right,y,1-(.07*swap_anim.step))
+				local sx=swap_anim.right
+				zspr(cell_sp,1,1,sx,y,1-(.07*swap_anim.step))
 			else
 				if col_idx==game.col_select
 					or col_idx==game.col_select+1 then
@@ -516,6 +554,7 @@ function update_level()
 			
 			-- if matching pair
 			elseif sp_n==sp_r then
+					
 					-- mark pair and points and things
 					if music_sfx then
 						sfx(51,3)
@@ -555,7 +594,6 @@ function update_level()
 				music(27)
 			end			
 			game.level+=1		
-			--todo: check end of game
 			init_ready()
 		end
 
@@ -899,13 +937,13 @@ a0000a94042442404ff44ff4422222240ee282007f2222f7aaaa88aa888888884999999442222224
 0000009a00022000444444449f4ffff9000000709ffffff9889988990f9f9f90094949409f4ffff9444444440000000000000000000000000000000000000000
 000000a0000ff000f777777f0ffffff00000000709999990999999990f9f9f90024949200ffffff0f777777f0000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000d0000000d0000000d000000ddd0000ddddd00ddddddd00000000000000000000000000000000
+000000000000000000000000000000000000d000000ddd00000ddd0000ddddd000ddddd000ddddd00ddddddd0ddddddd00000000000000000000000000000000
+00000000000000000000d000000ddd00000ddd0000ddddd000ddddd000ddddd000ddddd00ddddddd0ddddddd0ddddddd00000000000000000000000000000000
+0000d000000dd000000ddd00000ddd0000ddddd000ddddd00ddddddd0ddddddd0ddddddd0ddddddd0ddddddd0ddddddd00000000000000000000000000000000
+00000000000000000000d000000ddd00000ddd0000ddddd000ddddd000ddddd000ddddd00ddddddd0ddddddd0ddddddd00000000000000000000000000000000
+000000000000000000000000000000000000d000000ddd00000ddd0000ddddd000ddddd000ddddd00ddddddd0ddddddd00000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000d0000000d0000000d000000ddd0000ddddd00ddddddd00000000000000000000000000000000
 00dddddddddddddd00dddddddddddddd000dddddd000dddddd000ddddd000dddddddddddddd00000ddddddddddddd0000dddddddd0000000ddddd00000000000
 00d111111111111d00d11111111111dd000d1111d000d111dd000d111d000d11111111111dd00000d11111111111d0000d111111d0000000d111d00000000000
 ddd111111111111d0dd11111111111dd0ddd1111ddddd111dd0ddd111d0ddd11111111111dd00dddd11111111111d00ddd111111d00000ddd111d00000000000
